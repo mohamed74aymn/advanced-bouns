@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Image Compression Preview</title>
+		<style>
+			body {
+				font-family: Arial, sans-serif;
+				text-align: center;
+				margin: 0;
+				padding: 0;
+				background-color: #f4f4f4;
+			}
+			.container {
+				margin: 20px auto;
+				width: 95%;
+				max-width: 1200px;
+			}
+			.button {
+				padding: 10px 20px;
+				background-color: #ff7700;
+				color: white;
+				border: none;
+				border-radius: 5px;
+				cursor: pointer;
+				margin: 10px;
+			}
+			.button:hover {
+				background-color: #b37100;
+			}
+			.image-preview {
+				display: flex;
+				flex-direction: column;
+				gap: 40px;
+				margin-top: 20px;
+			}
+			.card {
+				border: 1px solid #ddd;
+				padding: 10px;
+				border-radius: 8px;
+				background-color: white;
+				text-align: center;
+				box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+			}
+			img {
+				max-width: 100%;
+				height: auto;
+				display: block;
+				margin: 0 auto;
+				border-radius: 8px;
+			}
+			.card h3 {
+				margin: 10px 0 5px;
+			}
+			.card p {
+				margin: 10px 0;
+			}
+			.alert {
+				position: fixed;
+				top: 20px;
+				left: 50%;
+				transform: translateX(-50%);
+				background-color: #fce4ec;
+				color: #d81b60;
+				padding: 15px 25px;
+				border: 1px solid #f8bbd0;
+				border-radius: 10px;
+				box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+				font-size: 16px;
+				font-weight: bold;
+				z-index: 1000;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h1>Image Compression</h1>
+			<input type="file" id="imageInput" accept="image/*" class="button" />
+			<div id="preview" class="image-preview"></div>
+		</div>
+
+		<script>
+			const imageInput = document.getElementById("imageInput");
+			const previewContainer = document.getElementById("preview");
+
+			let originalImage = null;
+			let originalSize = 0;
+
+			imageInput.addEventListener("change", (event) => {
+				const file = event.target.files[0];
+				if (!file) return;
+
+				originalSize = file.size;
+
+				if (originalSize <= 2 * 1024 * 1024) {
+					showAlert("Please upload an image larger than 2 MB.");
+					imageInput.value = "";
+					return;
+				}
+
+				const reader = new FileReader();
+				reader.onload = (e) => {
+					originalImage = e.target.result;
+					previewContainer.innerHTML = "";
+					generatePreview(
+						"Original Image",
+						e.target.result,
+						originalSize,
+						"original"
+					);
+					generateCompressedImages();
+				};
+				reader.readAsDataURL(file);
+			});
+
+			function showAlert(message) {
+				const alertBox = document.createElement("div");
+				alertBox.className = "alert";
+				alertBox.textContent = message;
+				document.body.appendChild(alertBox);
+
+				setTimeout(() => {
+					document.body.removeChild(alertBox);
+				}, 3000);
+			}
+
+			function generatePreview(
+				title,
+				imageSrc,
+				size,
+				id,
+				downloadable = false
+			) {
+				const card = document.createElement("div");
+				card.className = "card";
+				card.innerHTML = `
+            <h3>${title}</h3>
+            <img src="${imageSrc}" alt="${title}" id="${id}">
+            <p>Size: ${(size / 1024).toFixed(2)} KB</p>
+            ${
+							downloadable
+								? `<a href="${imageSrc}" download="${title
+										.replace(" ", "_")
+										.toLowerCase()}.jpg" class="button">Download</a>`
+								: ""
+						}
+        `;
+				previewContainer.appendChild(card);
+			}
+
+			function generateCompressedImages() {
+				const percentages = [0.25, 0.5, 0.75];
+				percentages.forEach((percentage) => {
+					compressImageToPercentage(originalImage, percentage);
+				});
+			}
+
+			function compressImageToPercentage(imageSrc, percentage) {
+				const targetSize = originalSize * percentage;
+				const img = new Image();
+				img.src = imageSrc;
+
+				img.onload = () => {
+					const canvas = document.createElement("canvas");
+					const ctx = canvas.getContext("2d");
+					canvas.width = img.width;
+					canvas.height = img.height;
+
+					ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+					let quality = 0.95;
+					const step = 0.05;
+					let currentBlob = null;
+
+					const compress = () => {
+						canvas.toBlob(
+							(blob) => {
+								if (blob.size <= targetSize || quality <= 0.1) {
+									currentBlob = blob;
+									const compressedUrl = URL.createObjectURL(blob);
+									generatePreview(
+										`Compressed to ${percentage * 100}%`,
+										compressedUrl,
+										blob.size,
+										`compressed_${percentage * 100}`,
+										true
+									);
+								} else {
+									quality -= step;
+									compress();
+								}
+							},
+							"image/jpeg",
+							quality
+						);
+					};
+
+					compress();
+				};
+			}
+		</script>
+	</body>
+</html>
